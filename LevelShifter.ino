@@ -1,3 +1,4 @@
+#include <Servo.h> //this enables the library for the servo motor
 #define IN0    2      /* D2 */ 
 #define IN1    3      /* D3 */
 #define IN2    4      /* D4 */
@@ -12,8 +13,10 @@
 #define F(x) x
 
 static const uint8_t g_Major = 0;
-static const uint8_t g_Minor = 2;
+static const uint8_t g_Minor = 3;
 static const char g_info[]   = F("info");
+static const char g_goto[]   = F("goto");
+static const char g_ADC7[]   = F("ADC7");
 static const char g_low[]    = F("low");
 static const char g_high[]   = F("high");
 static const char g_cursor[] = F(">>");
@@ -25,11 +28,21 @@ struct pin_definition {
   const char* name;
 };
 
+struct analog_pin_definition {
+  const uint8_t pin;
+  const char* name;
+  uint16_t period;
+  unsigned long lastPublish;
+};
+
+static Servo g_servoMotor;
+
 struct pin_definition input_pins[] =  { { IN0, F("IN0") }, { IN1, F("IN1") }, { IN2, F("IN2") }, { IN3, F("IN3") } };
 struct pin_definition output_pins[] = { { OUT0, F("OUT0") }, { OUT1, F("OUT1") }, { OUT2, F("OUT2") }, { OUT3, F("OUT3") } };
+struct analog_pin_definition analog_pins[] = { { 7, F("ADC7"), 0, 0 } };
 
 void Help () {
-  Serial.print(F("Levelshifter board"));
+  Serial.print(F("Levelshifter board "));
   Serial.print(g_Major);
   Serial.print(F("."));
   Serial.print(g_Minor);
@@ -58,12 +71,28 @@ void Info() {
   } 
 }
 
+void Goto(int16_t position) {
+  Serial.print("Moving to: ");
+  Serial.println(position);
+  g_servoMotor.write(position);
+}
+
+void UnderPressure(const uint8_t pin) {
+  uint16_t pressure = analogRead(pin);
+  Serial.println(pressure);
+}
+
 void UserEvaluation(const uint8_t length, const char buffer[]) {
 
   if ((length == 1) && (buffer[0] == '?')) {
     Help();
   } else if (strncmp (g_info, buffer, (sizeof(g_info)/sizeof(char) - 1)) == 0) {
     Info();
+  } else if (strncmp (g_goto, buffer, (sizeof(g_goto)/sizeof(char) - 1)) == 0) {
+      if ( (buffer[sizeof(g_goto)/sizeof(char)-1] == '=') && (length >= (sizeof(g_goto)/sizeof(char)+1)) ) {
+      int degrees= atoi(&(buffer[sizeof(g_goto)/sizeof(char)]));
+      Goto(degrees);
+    }
   }
   else {
     bool handled = false;
@@ -85,6 +114,32 @@ void UserEvaluation(const uint8_t length, const char buffer[]) {
           }
           else {
             Serial.println(F("Unrecognized value, must be '0', '1', 'l', 'h', 'L' or 'H'"));
+          }
+        }
+      }
+    }
+
+    for (uint8_t index = 0; ((handled == false) && (index < sizeof(analog_pins)/sizeof(struct analog_pin_definition))); index++) {
+      const uint8_t keyLength = strlen(analog_pins[index].name);
+      if (strncmp (analog_pins[index].name, buffer, keyLength) == 0) {
+        handled = true;
+        if ((buffer[keyLength] != '=') || (length != (keyLength + 2))) {
+            Serial.println(F("Syntax should be '<pin name>=<duration in 100ms>'"));
+        }
+        else {
+          const uint16_t value = atoi(&(buffer[keyLength + 1]));  
+          analog_pins[index].period = value*100;
+          analog_pins[index].lastPublish = 0;
+          if (value == 0) {
+            Serial.print(F("Disabled the monitoring of: "));
+            Serial.println(analog_pins[index].name);
+          }
+          else {
+            Serial.print(F("Enabled monitoring of ["));
+            Serial.print(analog_pins[index].name);
+            Serial.print(F("] to a value of: "));
+            Serial.print(analog_pins[index].period);
+            Serial.println(F(" ms"));
           }
         }
       }
@@ -149,9 +204,12 @@ void setup() {
       g_lastState |= (1 << index);
     }
   }
+
   Help();
   Info();
   Serial.print(g_cursor);
+
+  g_servoMotor.attach(11);
 }
 
 void loop() {
@@ -189,4 +247,11 @@ void loop() {
   }
 
   InputEvaluation(g_lastState);
+
+  for (uint8_t index = 0; (index < sizeof(analog_pins)/sizeof(struct analog_pin_definition)); index++) {
+    if ((analog_pins[index].period != 0) && (analog_pins[index].lastPublish < currentMillis)) {
+      analog_pins[index].lastPublish = currentMillis + analog_pins[index].period;
+      UnderPressure(analog_pins[index].pin);
+    } 
+  }
 }
