@@ -8,12 +8,11 @@
 #define OUT2   8      /* D8 */
 #define OUT3   9      /* D9 */
 
-
 #undef F
 #define F(x) x
 
 static const uint8_t g_Major = 0;
-static const uint8_t g_Minor = 1;
+static const uint8_t g_Minor = 2;
 static const char g_info[]   = F("info");
 static const char g_low[]    = F("low");
 static const char g_high[]   = F("high");
@@ -37,11 +36,6 @@ void Help () {
   Serial.println(F("---------------------------------------"));
   Serial.println(F("'?' this screen"));
   Serial.println(F("'info' display the current settings of in and out"));
-  for (uint8_t index = 0; index < sizeof(output_pins)/sizeof(struct pin_definition); index++) {
-    Serial.print(F("'"));
-    Serial.print(output_pins[index].name);
-    Serial.println(F("=[0|1]' set the output value to the assigned value (0=low,1=high)"));
-  }
 }
 
 void Info() {
@@ -66,7 +60,7 @@ void Info() {
 
 void UserEvaluation(const uint8_t length, const char buffer[]) {
 
-  if ((length == 1) && (buffer == '?')) {
+  if ((length == 1) && (buffer[0] == '?')) {
     Help();
   } else if (strncmp (g_info, buffer, (sizeof(g_info)/sizeof(char) - 1)) == 0) {
     Info();
