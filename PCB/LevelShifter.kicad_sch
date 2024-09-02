@@ -23360,7 +23360,7 @@
 				)
 			)
 		)
-		(property "Footprint" "footprints:74404052039"
+		(property "Footprint" "Components:CD75"
 			(at 68.58 263.83 0)
 			(effects
 				(font
