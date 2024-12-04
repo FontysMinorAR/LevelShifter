@@ -1,13 +1,25 @@
 #include <Servo.h> //this enables the library for the servo motor
-#define IN0    2      /* D2 */ 
-#define IN1    3      /* D3 */
-#define IN2    4      /* D4 */
-#define IN3    5      /* D5 */
 
-#define OUT0   6      /* D6 */
-#define OUT1   7      /* D7 */
-#define OUT2   8      /* D8 */
-#define OUT3   9      /* D9 */
+#define IN0    2      /* D2  */ 
+#define IN1    3      /* D3  */
+#define IN2    4      /* D4  */
+#define IN3    7      /* D7  */
+
+#define OUT0   8      /* D8  */
+#define OUT1   9      /* D9  */
+#define OUT2   10     /* D10 */
+#define OUT3   14     /* A0 */
+
+#define ADC0   20     /* A6 */
+#define ADC1   17     /* A3 */ 
+#define ADC2   16     /* A2 */
+#define ADC3   21     /* A7 */
+
+#define PWM0   5      /* D5 */
+#define PWM1   6      /* D6 */
+
+#define ENABLE0 15    /* A1 */ 
+#define ENABLE1 19    /* A5 */
 
 #undef F
 #define F(x) x
@@ -16,7 +28,6 @@ static const uint8_t g_Major = 0;
 static const uint8_t g_Minor = 3;
 static const char g_info[]   = F("info");
 static const char g_goto[]   = F("goto");
-static const char g_ADC7[]   = F("ADC7");
 static const char g_low[]    = F("low");
 static const char g_high[]   = F("high");
 static const char g_cursor[] = F(">>");
@@ -35,11 +46,12 @@ struct analog_pin_definition {
   unsigned long lastPublish;
 };
 
-static Servo g_servoMotor;
+static Servo g_servoMotor0;
+static Servo g_servoMotor1;
 
 struct pin_definition input_pins[] =  { { IN0, F("IN0") }, { IN1, F("IN1") }, { IN2, F("IN2") }, { IN3, F("IN3") } };
-struct pin_definition output_pins[] = { { OUT0, F("OUT0") }, { OUT1, F("OUT1") }, { OUT2, F("OUT2") }, { OUT3, F("OUT3") } };
-struct analog_pin_definition analog_pins[] = { { 7, F("ADC7"), 0, 0 } };
+struct pin_definition output_pins[] = { { OUT0, F("OUT0") }, { OUT1, F("OUT1") }, { OUT2, F("OUT2") }, { OUT3, F("OUT3") }, { ENABLE0, F("EN0") }, { ENABLE1, F("EN1") } };
+struct analog_pin_definition analog_pins[] = { { ADC0, F("ADC0"), 0, 0 }, { ADC1, F("ADC1"), 0, 0 }, { ADC2, F("ADC2"), 0, 0 } };
 
 void Help () {
   Serial.print(F("Levelshifter board "));
@@ -71,10 +83,10 @@ void Info() {
   } 
 }
 
-void Goto(int16_t position) {
+void Goto(Servo* servo, int16_t position) {
   Serial.print("Moving to: ");
   Serial.println(position);
-  g_servoMotor.write(position);
+  servo->write(position);
 }
 
 void UnderPressure(const uint8_t pin) {
@@ -89,9 +101,14 @@ void UserEvaluation(const uint8_t length, const char buffer[]) {
   } else if (strncmp (g_info, buffer, (sizeof(g_info)/sizeof(char) - 1)) == 0) {
     Info();
   } else if (strncmp (g_goto, buffer, (sizeof(g_goto)/sizeof(char) - 1)) == 0) {
-      if ( (buffer[sizeof(g_goto)/sizeof(char)-1] == '=') && (length >= (sizeof(g_goto)/sizeof(char)+1)) ) {
-      int degrees= atoi(&(buffer[sizeof(g_goto)/sizeof(char)]));
-      Goto(degrees);
+      if ( (buffer[sizeof(g_goto)/sizeof(char)] == '=') && (length >= (sizeof(g_goto)/sizeof(char)+2)) ) {
+      int degrees= atoi(&(buffer[sizeof(g_goto)/sizeof(char) + 1]));
+      if (buffer[sizeof(g_goto)/sizeof(char)-1] == '0') {
+        Goto(&g_servoMotor0, degrees);
+      }
+      else {
+        Goto(&g_servoMotor1, degrees);
+      }
     }
   }
   else {
@@ -209,7 +226,8 @@ void setup() {
   Info();
   Serial.print(g_cursor);
 
-  g_servoMotor.attach(11);
+  g_servoMotor0.attach(PWM0);
+  g_servoMotor1.attach(PWM1);
 }
 
 void loop() {
